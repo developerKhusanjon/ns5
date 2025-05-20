@@ -33,54 +33,39 @@ object SystemInfo:
     )
 
   private def getHostname[F[_]: Sync: Logger]: F[String] =
-    Sync[F].delay {
-      try
-        InetAddress.getLocalHost.getHostName
-      catch
-        case NonFatal(e) =>
-          Logger[F].warn(s"Failed to get hostname: ${e.getMessage}").unsafeRunSync()
-          "unknown-host"
-    }
+    Sync[F].delay(InetAddress.getLocalHost.getHostName)
+      .handleErrorWith { e =>
+        Logger[F].warn(s"Failed to get hostname: ${e.getMessage}") *>
+          Sync[F].pure("unknown-host")
+      }
 
   private def getIpAddress[F[_]: Sync: Logger]: F[String] =
-    Sync[F].delay {
-      try
-        InetAddress.getLocalHost.getHostAddress
-      catch
-        case NonFatal(e) =>
-          Logger[F].warn(s"Failed to get IP address: ${e.getMessage}").unsafeRunSync()
-          "127.0.0.1"
-    }
+    Sync[F].delay(InetAddress.getLocalHost.getHostAddress)
+      .handleErrorWith { e =>
+        Logger[F].warn(s"Failed to get IP address: ${e.getMessage}") *>
+          Sync[F].pure("127.0.0.1")
+      }
 
   private def getOperatingSystem[F[_]: Sync: Logger]: F[String] =
-    Sync[F].delay {
-      try
-        System.getProperty("os.name")
-      catch
-        case NonFatal(e) =>
-          Logger[F].warn(s"Failed to get OS: ${e.getMessage}").unsafeRunSync()
-          "Unknown OS"
-    }
+    Sync[F].delay(System.getProperty("os.name"))
+      .handleErrorWith { e =>
+        Logger[F].warn(s"Failed to get OS: ${e.getMessage}") *>
+          Sync[F].pure("Unknown OS")
+      }
 
   private def getOsVersion[F[_]: Sync: Logger]: F[String] =
-    Sync[F].delay {
-      try
-        System.getProperty("os.version")
-      catch
-        case NonFatal(e) =>
-          Logger[F].warn(s"Failed to get OS version: ${e.getMessage}").unsafeRunSync()
-          "Unknown Version"
-    }
+    Sync[F].delay(System.getProperty("os.version"))
+      .handleErrorWith { e =>
+        Logger[F].warn(s"Failed to get OS version: ${e.getMessage}") *>
+          Sync[F].pure("Unknown Version")
+      }
 
   private def getCpuArchitecture[F[_]: Sync: Logger]: F[String] =
-    Sync[F].delay {
-      try
-        System.getProperty("os.arch")
-      catch
-        case NonFatal(e) =>
-          Logger[F].warn(s"Failed to get CPU architecture: ${e.getMessage}").unsafeRunSync()
-          "Unknown Architecture"
-    }
+    Sync[F].delay(System.getProperty("os.arch"))
+      .handleErrorWith { e =>
+        Logger[F].warn(s"Failed to get CPU architecture: ${e.getMessage}") *>
+          Sync[F].pure("Unknown Architecture")
+      }
 
 /** Utilities for process execution */
 object ProcessUtils:
@@ -88,14 +73,12 @@ object ProcessUtils:
     implicit val logger: Logger[F] = Slf4jLogger.getLogger[F]
 
     Sync[F].delay {
-      try
-        import scala.sys.process._
-        val output = command.!!
-        output
-      catch
-        case NonFatal(e) =>
-          Logger[F].warn(s"Failed to execute command ${command.mkString(" ")}: ${e.getMessage}").unsafeRunSync()
-          "Command execution failed"
+      import  scala.sys.process._
+      val output = command.!!
+      output
+    }.handleErrorWith { e =>
+      Logger[F].warn(s"Failed to execute command ${command.mkString(" ")}: ${e.getMessage}") *>
+        Sync[F].pure("Command execution failed")
     }
 
 /** Utilities for network operations */
@@ -104,16 +87,14 @@ object NetworkUtils:
     implicit val logger: Logger[F] = Slf4jLogger.getLogger[F]
 
     Sync[F].delay {
-      try
-        val interfaces = NetworkInterface.getNetworkInterfaces.asScala.toList
-        interfaces.flatMap { iface =>
+      NetworkInterface.getNetworkInterfaces.asScala.toList
+        .flatMap { iface =>
           if iface.isUp && !iface.isLoopback && !iface.isVirtual then
             Some(iface.getName)
           else
             None
         }
-      catch
-        case NonFatal(e) =>
-          Logger[F].warn(s"Failed to get network interfaces: ${e.getMessage}").unsafeRunSync()
-          List("eth0") // Fallback to a default name
+    }.handleErrorWith { e =>
+          Logger[F].warn(s"Failed to get network interfaces: ${e.getMessage}") *>
+            Sync[F].pure(List("eth0")) // Fallback to default
     }
