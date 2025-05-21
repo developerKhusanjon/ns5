@@ -4,7 +4,6 @@ import cats.effect.*
 import cats.syntax.all.*
 import fs2.Stream
 import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import com.endsec.domain.*
 import com.endsec.repositories.SecurityEventRepository
@@ -14,6 +13,7 @@ import java.time.Instant
 import java.util.UUID
 import scala.concurrent.duration.*
 import scala.util.Random
+import cats.effect.syntax.spawn.*
 
 /** Service for monitoring network traffic for anomalies */
 trait NetworkMonitorService[F[_]]:
@@ -85,7 +85,6 @@ private class NetworkMonitorServiceImpl[F[_]: Async: Logger](
                                                               statsRef: Ref[F, TrafficStats],
                                                               networkInterfaces: List[String]
                                                             ) extends NetworkMonitorService[F]:
-  private implicit val logger: Logger[F] = Slf4jLogger.getLogger[F]
 
   // Known suspicious IP addresses and ports (would be more extensive in a real app)
   private val suspiciousIps: Set[String] = Set(
@@ -108,7 +107,7 @@ private class NetworkMonitorServiceImpl[F[_]: Async: Logger](
       _ <- Logger[F].info("Starting network traffic monitoring")
       maybeExistingFiber <- monitorRef.get
       _ <- maybeExistingFiber.traverse_(_.cancel)
-      now = Instant.now()
+      now <- Async[F].realTimeInstant
       _ <- startTimeRef.set(Some(now))
       fiber <- monitorNetworkTraffic.start
       _ <- monitorRef.set(Some(fiber))

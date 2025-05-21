@@ -5,7 +5,6 @@ import cats.syntax.all.*
 import fs2.Stream
 import fs2.io.file.{Files, Path}
 import org.typelevel.log4cats.Logger
-import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import com.endsec.domain.*
 import com.endsec.repositories.SecurityEventRepository
@@ -34,7 +33,6 @@ private class VirusScanServiceImpl[F[_]: Async: Files: Logger](
                                                                 repository: SecurityEventRepository[F],
                                                                 hostInfo: HostInfo
                                                               ) extends VirusScanService[F]:
-  private implicit val logger: Logger[F] = Slf4jLogger.getLogger[F]
 
   // Virus signatures database (in a real app would be much more sophisticated)
   private val virusSignatures: Map[String, String] = Map(
@@ -59,14 +57,13 @@ private class VirusScanServiceImpl[F[_]: Async: Files: Logger](
     yield result
 
   def scanDirectory(dir: Path, recursive: Boolean): Stream[F, VirusDetection] =
-    for
-      path <- if recursive then
-        Files[F].walk(dir)
-      else
-        Files[F].list(dir)
-      if Files[F].isRegularFile(path).unsafeRunSync()
-      virus <- Stream.eval(scanFile(path)).flatMap(Stream.fromOption(_))
-    yield virus
+    (if recursive then Files[F].walk(dir) else Files[F].list(dir))
+      .flatMap { path =>
+        Stream.eval(Files[F].isRegularFile(path)).flatMap { regular =>
+          if regular then Stream.eval(scanFile(path)).flatMap(Stream.fromOption(_))
+          else Stream.empty
+        }
+      }
 
   def fullSystemScan: F[ScanResult[VirusDetection]] =
     val scanId = UUID.randomUUID()
