@@ -27,6 +27,7 @@ lazy val root = (project in file("."))
       "io.github.resilience4j" % "resilience4j-all" % "2.0.2"
     ),
     scalacOptions ++= Seq(
+      "-Xmax-inlines", "64",
       "-Xcheck-macros",
       "-source:3.3",
       "-unchecked",
